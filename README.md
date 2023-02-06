@@ -1,4 +1,4 @@
-### Golang OpenTelemetry example with Zipkins and Jaeger
+### Golang OpenTelemetry example with Datadog, Zipkins and Jaeger
 
 Start Jaeger, Zipkin and OTEL Collector
 ```shell
