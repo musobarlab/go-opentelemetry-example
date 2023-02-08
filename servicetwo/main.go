@@ -7,15 +7,23 @@ import (
 	"os"
 	"fmt"
 	"net/http"
+	"math/rand"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric/global"
+	"go.opentelemetry.io/otel/metric/instrument"
 	"github.com/musobarlab/go-opentelemetry-example/helper/tracer"
 )
 
 const (
 	Name = "consumer"
+)
+
+var (
+	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 func main() {
@@ -28,7 +36,7 @@ func main() {
 
 	// tracerProvider, err := tracer.InitZipkinProvider(zipkinURL, "consumer", "development", int64(2))
 	// tracerProvider, err := tracer.InitJaegerProvider(jaegerURL, "consumer", "development", int64(2))
-	tracerProvider, err := tracer.InitDatadogProvider(ctx, otelURL, "consumer", "development", int64(2))
+	tracerProvider, meterProvider, err := tracer.InitDatadogProvider(ctx, otelURL, "consumer", "development", int64(2))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -42,9 +50,54 @@ func main() {
 	// instrumentation in the future will default to using it.
 	otel.SetTracerProvider(tracerProvider)
 
-	http.Handle("/consume", consumeHandler())
+	// set metric provider
+	global.SetMeterProvider(meterProvider)
+
+	meter := global.Meter(Name)
+	meterRequestCounter, err := meter.Int64Counter(
+		fmt.Sprintf("%s/request_counts", Name),
+		instrument.WithDescription("Total number of requests received"),
+	)
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	http.Handle("/consume", metricMiddleware(meterRequestCounter, consumeHandler()))
 
 	log.Fatal(http.ListenAndServe(":9002", nil))
+}
+
+func metricMiddleware(requestCounter instrument.Int64Counter, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		labels := []attribute.KeyValue {
+			attribute.Key("req.Host").String(req.Host),
+			attribute.Key("req.URL").String(req.URL.String()),
+			attribute.Key("req.Method").String(req.Method),
+		}
+		//  random sleep to simulate latency
+		var sleep int64
+
+		switch modulus := time.Now().Unix() % 5; modulus {
+		case 0:
+			sleep = rng.Int63n(2000)
+		case 1:
+			sleep = rng.Int63n(15)
+		case 2:
+			sleep = rng.Int63n(917)
+		case 3:
+			sleep = rng.Int63n(87)
+		case 4:
+			sleep = rng.Int63n(1173)
+		}
+		time.Sleep(time.Duration(sleep) * time.Millisecond)
+		ctx := req.Context()
+
+		requestCounter.Add(ctx, 1, labels...)
+
+		next.ServeHTTP(res, req)
+	})
 }
 
 func consumeHandler() http.Handler {

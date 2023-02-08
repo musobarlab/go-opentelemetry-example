@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/metric/global"
 	"github.com/musobarlab/go-opentelemetry-example/helper"
 	"github.com/musobarlab/go-opentelemetry-example/helper/tracer"
 )
@@ -33,7 +34,7 @@ func main() {
 
 	// tracerProvider, err := tracer.InitZipkinProvider(zipkinURL, "client-service", "development", int64(3))
 	// tracerProvider, err := tracer.InitJaegerProvider(jaegerURL, "client-service", "development", int64(3))
-	tracerProvider, err := tracer.InitDatadogProvider(ctx, otelURL, "client-service", "development", int64(3))
+	tracerProvider, meterProvider, err := tracer.InitDatadogProvider(ctx, otelURL, "client-service", "development", int64(3))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -44,6 +45,9 @@ func main() {
 	// Register our TracerProvider as the global so any imported
 	// instrumentation in the future will default to using it.
 	otel.SetTracerProvider(tracerProvider)
+
+	// set metric provider
+	global.SetMeterProvider(meterProvider)
 
 	productName := os.Args[1]
 
