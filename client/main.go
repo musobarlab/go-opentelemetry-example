@@ -26,15 +26,21 @@ func main() {
 	}
 
 	// zipkinURL := "http://localhost:9411/api/v2/spans"
-	// jaegerURL := "http://localhost:14268/api/traces"
+	jaegerURL := "http://localhost:14268/api/traces"
 	otelURL := "127.0.0.1:4317"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// tracerProvider, err := tracer.InitZipkinProvider(zipkinURL, "client-service", "development", int64(3))
-	// tracerProvider, err := tracer.InitJaegerProvider(jaegerURL, "client-service", "development", int64(3))
-	tracerProvider, meterProvider, err := tracer.InitDatadogProvider(ctx, otelURL, "client-service", "development", int64(3))
+	tracerProvider, err := tracer.InitJaegerProvider(jaegerURL, "client-service", "development", int64(3))
+	// tracerProvider, meterProvider, err := tracer.InitDatadogProvider(ctx, otelURL, "client-service", "development", int64(3))
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	os.Exit(1)
+	// }
+
+	meterProvider, err := tracer.InitMetricProvider(ctx, otelURL, "client-service", "development", int64(3))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -78,12 +84,8 @@ func main() {
 	product := consume(ctx, data, productName)
 	fmt.Println("product id : ", product.ID)
 	fmt.Println("product name : ", product.Name)
-	
-	// span 4
-	productAndID := formatString(ctx, fmt.Sprintf("%s:%s", product.ID, product.Name))
-	fmt.Println(productAndID)
 
-	// span 5
+	// span 4
 	printHello(ctx, "Opentelemetry")
 
 }
@@ -118,7 +120,10 @@ func printHello(ctx context.Context, helloStr string) {
 		span.End()
 	}()
 
-	println(helloStr)
+	// span 5
+	res := formatString(ctx, helloStr)
+
+	println(res)
 }
 
 func produce(ctx context.Context) []byte {

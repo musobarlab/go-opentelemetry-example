@@ -27,15 +27,21 @@ var (
 
 func main() {
 	// zipkinURL := "http://localhost:9411/api/v2/spans"
-	// jaegerURL := "http://localhost:14268/api/traces"
+	jaegerURL := "http://localhost:14268/api/traces"
 	otelURL := "127.0.0.1:4317"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// tracerProvider, err := tracer.InitZipkinProvider(zipkinURL, "producer", "development", int64(1))
-	// tracerProvider, err := tracer.InitJaegerProvider(jaegerURL, "producer", "development", int64(1))
-	tracerProvider, meterProvider, err := tracer.InitDatadogProvider(ctx, otelURL, "producer", "development", int64(1))
+	tracerProvider, err := tracer.InitJaegerProvider(jaegerURL, "producer", "development", int64(1))
+	// tracerProvider, meterProvider, err := tracer.InitDatadogProvider(ctx, otelURL, "producer", "development", int64(1))
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	os.Exit(1)
+	// }
+
+	meterProvider, err := tracer.InitMetricProvider(ctx, otelURL, "producer", "development", int64(1))
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

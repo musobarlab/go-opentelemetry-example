@@ -19,22 +19,58 @@ services:
 
   # Datadog Agent
   # https://docs.datadoghq.com/opentelemetry/otlp_ingest_in_the_agent/?tab=docker
-  datadog:
-    image: datadog/agent:latest
-    environment:
-      - DD_API_KEY=${DD_API_KEY}
-      - DD_SITE=${DD_SITE}
-      - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=${DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT}
+  # datadog:
+  #   image: datadog/agent:latest
+  #   environment:
+  #     - DD_API_KEY=${DD_API_KEY}
+  #     - DD_SITE=${DD_SITE}
+  #     - DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=${DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT}
+  #   ports:
+  #     - "8125:8125"
+  #     - "8126:8126"
+  #     - "4317:4317"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - /proc/:/host/proc/:ro
+  #     - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
+  #   networks:
+  #     - example
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.36.2
+    user: "1000:1000"
     ports:
-      - "8125:8125"
-      - "8126:8126"
-      - "4317:4317"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /proc/:/host/proc/:ro
-      - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
+      - 9090:9090
+    depends_on:
+      - otel-collector
     networks:
       - example
+    restart: on-failure:10
+    volumes:
+      - ${PWD}/prometheus/config:/etc/prometheus
+      - ${PWD}/volumes/prometheus/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    
+  grafana:
+    image: grafana/grafana
+    user: "1000:1000"
+    depends_on:
+      - prometheus
+    links:
+      - prometheus:prometheus
+    ports:
+      - 3000:3000
+    volumes:
+      - ${PWD}/volumes/grafana/data:/var/lib/grafana
+      - ${PWD}/grafana/provisioning/:/etc/grafana/provisioning/
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - example
+    restart: always
 
   # otel-collector:
   #   image: otel/opentelemetry-collector-contrib
@@ -46,5 +82,15 @@ services:
   #   networks:
   #     - example
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./prometheus_otel_collector.yml:/etc/otel-collector-config.yml
+    ports:
+      - "4317:4317"
+      - "4444:4444"
+    networks:
+      - example
 networks:
   example:

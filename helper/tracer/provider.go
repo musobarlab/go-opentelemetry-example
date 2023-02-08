@@ -75,6 +75,50 @@ func InitJaegerProvider(url string, serviceName string, env string, id int64) (*
 	return tp, nil
 }
 
+// InitMetricProvider
+func InitMetricProvider(ctx context.Context, url string, serviceName string, env string, id int64) (metric.MeterProvider, error) {
+	// Create the Datadog exporter
+
+	// resource
+	res, err := resource.New(ctx,
+		resource.WithFromEnv(),
+		resource.WithProcess(),
+		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+		resource.WithAttributes(
+			// the service name used to display traces in backends
+			semconv.ServiceNameKey.String(serviceName),
+			attribute.String("environment", env),
+			attribute.Int64("ID", id),
+		),
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// metric
+	metricExporter, err := otlpmetricgrpc.New(
+		ctx,
+		otlpmetricgrpc.WithInsecure(),
+		otlpmetricgrpc.WithEndpoint(url))
+	if err != nil {
+		return nil, err
+	}
+
+	meterProvider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithResource(res),
+		sdkmetric.WithReader(
+			sdkmetric.NewPeriodicReader(
+				metricExporter,
+				sdkmetric.WithInterval(2*time.Second),
+			),
+		),
+	)
+
+	return meterProvider, nil
+}
+
 // InitDatadogProvider
 func InitDatadogProvider(ctx context.Context, url string, serviceName string, env string, id int64) (*sdktrace.TracerProvider, metric.MeterProvider, error) {
 	// Create the Datadog exporter
